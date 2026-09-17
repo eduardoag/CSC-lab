@@ -1,0 +1,43 @@
+# ============================================================
+# CSC LAB - Archivos que Git NO debe versionar
+# ============================================================
+
+# Entornos virtuales de Python
+venv/
+.venv/
+
+# Archivos temporales de Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Configuración privada de Streamlit
+.streamlit/secrets.toml
+
+# Variables de entorno / credenciales
+.env
+.env.*
+
+# Bases de datos locales
+*.db
+*.sqlite
+*.sqlite3
+
+# Datos generados localmente
+data/*.csv
+data/*.json
+
+# Mantener la carpeta data dentro del repositorio
+!data/.gitkeep
+
+# Editores / IDE
+.vscode/
+.idea/
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# Archivos temporales
+*.log
+*.tmp
