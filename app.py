@@ -6,12 +6,29 @@
 import streamlit as st
 
 from componentes.encabezado import mostrar_encabezado
+from componentes.perfil_alumno import mostrar_perfil_alumno
 from config.cursos import CURSOS
 from core.acceso import (
     obtener_cursos_habilitados,
     obtener_fecha_hora_actual,
 )
+from core.autenticacion import validar_alumno
 from core.estilos import cargar_css
+from core.sesiones import (
+    cerrar_sesion,
+    crear_sesion,
+    inicializar_base_datos,
+    registrar_actividad,
+)
+
+from core.sesiones import (
+    cerrar_sesion,
+    crear_sesion,
+    expirar_sesiones_abandonadas,
+    inicializar_base_datos,
+    registrar_actividad,
+)
+
 
 
 # ============================================================
@@ -27,11 +44,25 @@ st.set_page_config(
 
 
 # ============================================================
-# ESTILOS Y ENCABEZADO
+# INICIALIZACIÓN
 # ============================================================
+
+inicializar_base_datos()
+expirar_sesiones_abandonadas()
 
 cargar_css()
 mostrar_encabezado()
+
+
+# ============================================================
+# ESTADO DE SESIÓN DE STREAMLIT
+# ============================================================
+
+if "alumno" not in st.session_state:
+    st.session_state.alumno = None
+
+if "sesion_id" not in st.session_state:
+    st.session_state.sesion_id = None
 
 
 # ============================================================
@@ -39,7 +70,10 @@ mostrar_encabezado()
 # ============================================================
 
 momento_actual = obtener_fecha_hora_actual()
-cursos_habilitados = obtener_cursos_habilitados(momento_actual)
+
+cursos_habilitados = obtener_cursos_habilitados(
+    momento_actual
+)
 
 dias = {
     0: "Lunes",
@@ -56,10 +90,11 @@ hora_actual = momento_actual.strftime("%H:%M")
 
 
 # ============================================================
-# LABORATORIO ABIERTO / CERRADO
+# LABORATORIO ABIERTO
 # ============================================================
 
 if cursos_habilitados:
+
     curso_id = cursos_habilitados[0]
     curso = CURSOS[curso_id]
 
@@ -71,18 +106,165 @@ Ahora estamos trabajando con:<br><br>
 </div>
 </div>"""
 
-    st.markdown(html_abierto, unsafe_allow_html=True)
-
-    st.success(
-        "¡Bienvenidos! Ya pueden ingresar a nuestro espacio de trabajo."
+    st.markdown(
+        html_abierto,
+        unsafe_allow_html=True,
     )
 
-    st.button(
-        "Ingresar a CSC Lab →",
-        use_container_width=True,
-    )
+
+    # ========================================================
+    # ALUMNO SIN IDENTIFICAR
+    # ========================================================
+
+    if st.session_state.alumno is None:
+
+        st.subheader(
+            "👤 Identificate para comenzar"
+        )
+
+        st.write(
+            "Ingresá tu número de lista y tu nombre."
+        )
+
+        with st.form(
+            "formulario_identificacion"
+        ):
+
+            numero_lista = st.number_input(
+                "Número de lista",
+                min_value=1,
+                max_value=60,
+                step=1,
+            )
+
+            nombre_ingresado = st.text_input(
+                "Tu nombre",
+                placeholder="Ejemplo: Agustín José",
+            )
+
+            ingresar = st.form_submit_button(
+                "Ingresar a CSC Lab →",
+                use_container_width=True,
+            )
+
+        if ingresar:
+
+            alumno = validar_alumno(
+                curso_id,
+                numero_lista,
+                nombre_ingresado,
+            )
+
+            if alumno is not None:
+
+                sesion_id = crear_sesion(
+                    alumno
+                )
+
+                st.session_state.alumno = alumno
+                st.session_state.sesion_id = sesion_id
+
+                st.rerun()
+
+            else:
+
+                st.error(
+                    "No pudimos verificar esos datos. "
+                    "Revisá tu número de lista y tu nombre."
+                )
+
+
+    # ========================================================
+    # ALUMNO IDENTIFICADO
+    # ========================================================
+
+    else:
+
+        alumno = st.session_state.alumno
+        sesion_id = st.session_state.sesion_id
+
+        # ----------------------------------------------------
+        # VERIFICAR QUE SIGUE EN SU CURSO
+        # ----------------------------------------------------
+
+        if alumno["curso"] != curso_id:
+
+            if sesion_id is not None:
+                cerrar_sesion(
+                    sesion_id
+                )
+
+            st.session_state.alumno = None
+            st.session_state.sesion_id = None
+
+            st.rerun()
+
+
+        # ----------------------------------------------------
+        # SESIÓN VÁLIDA
+        # ----------------------------------------------------
+
+        else:
+
+            if sesion_id is not None:
+                registrar_actividad(
+                    sesion_id
+                )
+
+            st.success(
+                f"¡Hola, {alumno['nombre']}! "
+                "Tu sesión está activa."
+            )
+
+            mostrar_perfil_alumno(
+                alumno
+            )
+
+            st.info(
+                "Tus misiones aparecerán aquí. "
+                "Muy pronto comenzaremos a trabajar 🚀"
+            )
+
+            if st.button(
+                "Cerrar mi sesión",
+                use_container_width=True,
+            ):
+
+                if sesion_id is not None:
+                    cerrar_sesion(
+                        sesion_id
+                    )
+
+                st.session_state.alumno = None
+                st.session_state.sesion_id = None
+
+                st.rerun()
+
+
+# ============================================================
+# LABORATORIO CERRADO
+# ============================================================
 
 else:
+
+    # --------------------------------------------------------
+    # CERRAR UNA SESIÓN QUE HAYA QUEDADO ABIERTA
+    # --------------------------------------------------------
+
+    if st.session_state.sesion_id is not None:
+
+        cerrar_sesion(
+            st.session_state.sesion_id
+        )
+
+    st.session_state.alumno = None
+    st.session_state.sesion_id = None
+
+
+    # --------------------------------------------------------
+    # PANTALLA DE LABORATORIO CERRADO
+    # --------------------------------------------------------
+
     html_cerrado = """<div class="csc-card csc-closed">
 <div class="csc-card-title">🔒 Laboratorio cerrado</div>
 <div class="csc-message">
@@ -92,7 +274,10 @@ Nos volvemos a encontrar en el aula.
 </div>
 </div>"""
 
-    st.markdown(html_cerrado, unsafe_allow_html=True)
+    st.markdown(
+        html_cerrado,
+        unsafe_allow_html=True,
+    )
 
     st.info(
         "No hay actividades para hacer en casa. "
@@ -112,7 +297,10 @@ html_estado = f"""<div class="csc-small">
 Zona horaria: Tucumán, Argentina
 </div>"""
 
-st.markdown(html_estado, unsafe_allow_html=True)
+st.markdown(
+    html_estado,
+    unsafe_allow_html=True,
+)
 
 
 # ============================================================
