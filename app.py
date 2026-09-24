@@ -17,19 +17,20 @@ from core.estilos import cargar_css
 from core.sesiones import (
     cerrar_sesion,
     crear_sesion,
-    inicializar_base_datos,
-    registrar_actividad,
-)
-
-from core.sesiones import (
-    cerrar_sesion,
-    crear_sesion,
     expirar_sesiones_abandonadas,
     inicializar_base_datos,
     registrar_actividad,
 )
 
+from componentes.cultura_constructor import (
+    mostrar_bienvenida_constructor,
+)
 
+from core.cultura import (
+    aceptar_reglas,
+    alumno_acepto_reglas,
+    inicializar_cultura,
+)
 
 # ============================================================
 # CONFIGURACIÓN DE PÁGINA
@@ -48,6 +49,7 @@ st.set_page_config(
 # ============================================================
 
 inicializar_base_datos()
+inicializar_cultura()
 expirar_sesiones_abandonadas()
 
 cargar_css()
@@ -191,7 +193,8 @@ Ahora estamos trabajando con:<br><br>
 
             if sesion_id is not None:
                 cerrar_sesion(
-                    sesion_id
+                    sesion_id,
+                    motivo="CAMBIO_CURSO",
                 )
 
             st.session_state.alumno = None
@@ -220,10 +223,64 @@ Ahora estamos trabajando con:<br><br>
                 alumno
             )
 
-            st.info(
-                "Tus misiones aparecerán aquí. "
-                "Muy pronto comenzaremos a trabajar 🚀"
-            )
+            # ========================================================
+            # CULTURA DEL CONSTRUCTOR
+            # Sólo corresponde a 3.º año
+            # ========================================================
+
+            if alumno["curso"] in ("3A", "3B"):
+
+                acepto_reglas = alumno_acepto_reglas(
+                    alumno["alumno_id"]
+                )
+
+                if not acepto_reglas:
+
+                    mostrar_bienvenida_constructor()
+
+                    if st.button(
+                        "✓ Acepto el desafío",
+                        use_container_width=True,
+                        type="primary",
+                    ):
+
+                        aceptar_reglas(
+                            alumno["alumno_id"]
+                        )
+
+                        if sesion_id is not None:
+                            registrar_actividad(
+                                sesion_id
+                            )
+
+                        st.rerun()
+
+                else:
+
+                    st.success(
+                        "🏗️ Sos parte del programa "
+                        "Constructores."
+                    )
+
+                    st.markdown(
+                        "### 🎯 Misión 01 · ENCONTRAR"
+                    )
+
+                    st.write(
+                        "Encontrar un problema real "
+                        "que merezca ser resuelto."
+                    )
+
+                    st.info(
+                        "La primera misión está a punto "
+                        "de comenzar."
+                    )
+
+            else:
+
+                st.info(
+                    "Tu espacio de TIC estará disponible aquí."
+                )
 
             if st.button(
                 "Cerrar mi sesión",
@@ -232,7 +289,8 @@ Ahora estamos trabajando con:<br><br>
 
                 if sesion_id is not None:
                     cerrar_sesion(
-                        sesion_id
+                        sesion_id,
+                        motivo="CIERRE_ALUMNO",
                     )
 
                 st.session_state.alumno = None
@@ -254,7 +312,8 @@ else:
     if st.session_state.sesion_id is not None:
 
         cerrar_sesion(
-            st.session_state.sesion_id
+            st.session_state.sesion_id,
+            motivo="FIN_HORARIO",
         )
 
     st.session_state.alumno = None
