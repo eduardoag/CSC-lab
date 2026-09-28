@@ -1,25 +1,14 @@
-# ============================================================
-# CSC LAB
-# Cultura del programa
-# ============================================================
-
-import sqlite3
 from datetime import datetime
-from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from sqlalchemy import text
+
 from config.horarios import ZONA_HORARIA
+from core.base_datos import obtener_conexion
 
-
-RUTA_PROYECTO = Path(__file__).resolve().parent.parent
-RUTA_DB = RUTA_PROYECTO / "data" / "csc_lab.db"
 
 PROGRAMA_CONSTRUCTOR = "constructor"
 VERSION_REGLAS = "v1"
-
-
-def obtener_conexion():
-    return sqlite3.connect(RUTA_DB)
 
 
 def obtener_momento_actual():
@@ -30,84 +19,78 @@ def obtener_momento_actual():
 
 def inicializar_cultura():
     """
-    Crea las tablas relacionadas con la cultura
-    del programa si todavía no existen.
+    El esquema se administra en PostgreSQL.
     """
-
-    with obtener_conexion() as conexion:
-
-        conexion.execute(
-            """
-            CREATE TABLE IF NOT EXISTS adhesiones_programa (
-                alumno_id TEXT NOT NULL,
-                programa TEXT NOT NULL,
-                version TEXT NOT NULL,
-                fecha_aceptacion TEXT NOT NULL,
-
-                PRIMARY KEY (
-                    alumno_id,
-                    programa,
-                    version
-                )
-            )
-            """
-        )
-
-        conexion.commit()
+    return
 
 
 def alumno_acepto_reglas(alumno_id):
-    """
-    Devuelve True si el alumno ya aceptó
-    la versión vigente de las reglas.
-    """
 
-    with obtener_conexion() as conexion:
+    conexion = obtener_conexion()
 
-        resultado = conexion.execute(
-            """
-            SELECT 1
-            FROM adhesiones_programa
-            WHERE alumno_id = ?
-              AND programa = ?
-              AND version = ?
-            """,
-            (
-                alumno_id,
-                PROGRAMA_CONSTRUCTOR,
-                VERSION_REGLAS,
+    with conexion.session as sesion:
+
+        resultado = sesion.execute(
+            text(
+                """
+                SELECT 1
+                FROM adhesiones_programa
+
+                WHERE alumno_id = :alumno_id
+                  AND programa = :programa
+                  AND version = :version
+
+                LIMIT 1
+                """
             ),
-        ).fetchone()
+            {
+                "alumno_id": alumno_id,
+                "programa": PROGRAMA_CONSTRUCTOR,
+                "version": VERSION_REGLAS,
+            },
+        ).first()
 
     return resultado is not None
 
 
 def aceptar_reglas(alumno_id):
-    """
-    Registra la aceptación de las reglas
-    del Constructor para la versión vigente.
-    """
 
     momento = obtener_momento_actual()
 
-    with obtener_conexion() as conexion:
+    conexion = obtener_conexion()
 
-        conexion.execute(
-            """
-            INSERT OR IGNORE INTO adhesiones_programa (
-                alumno_id,
-                programa,
-                version,
-                fecha_aceptacion
-            )
-            VALUES (?, ?, ?, ?)
-            """,
-            (
-                alumno_id,
-                PROGRAMA_CONSTRUCTOR,
-                VERSION_REGLAS,
-                momento.isoformat(),
+    with conexion.session as sesion:
+
+        sesion.execute(
+            text(
+                """
+                INSERT INTO adhesiones_programa (
+                    alumno_id,
+                    programa,
+                    version,
+                    fecha_aceptacion
+                )
+                VALUES (
+                    :alumno_id,
+                    :programa,
+                    :version,
+                    :fecha
+                )
+
+                ON CONFLICT (
+                    alumno_id,
+                    programa,
+                    version
+                )
+                DO NOTHING
+                """
             ),
+            {
+                "alumno_id": alumno_id,
+                "programa": PROGRAMA_CONSTRUCTOR,
+                "version": VERSION_REGLAS,
+                "fecha": momento,
+            },
         )
 
-        conexion.commit()
+        sesion.commit()

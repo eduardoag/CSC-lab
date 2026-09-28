@@ -1,35 +1,11 @@
-# ============================================================
-# CSC LAB
-# Motor de autenticación de alumnos
-# ============================================================
-
-import csv
 import unicodedata
-from pathlib import Path
 
+from sqlalchemy import text
 
-# ============================================================
-# UBICACIÓN DE LA BASE PRIVADA DE ALUMNOS
-# ============================================================
+from core.base_datos import obtener_conexion
 
-RUTA_PROYECTO = Path(__file__).resolve().parent.parent
-RUTA_ALUMNOS = RUTA_PROYECTO / "data" / "alumnos.csv"
-
-
-# ============================================================
-# NORMALIZACIÓN DE TEXTO
-# ============================================================
 
 def normalizar_texto(texto):
-    """
-    Normaliza un texto para poder compararlo de manera robusta.
-
-    Ejemplos:
-        "Agustín"  -> "agustin"
-        " AGUSTIN " -> "agustin"
-        "Tomás"    -> "tomas"
-    """
-
     texto = str(texto).strip().lower()
 
     texto = unicodedata.normalize(
@@ -46,91 +22,56 @@ def normalizar_texto(texto):
     return texto
 
 
-# ============================================================
-# CARGA DE ALUMNOS
-# ============================================================
-
-def cargar_alumnos():
-    """
-    Lee la base privada data/alumnos.csv.
-
-    Devuelve una lista de diccionarios.
-    """
-
-    if not RUTA_ALUMNOS.exists():
-        raise FileNotFoundError(
-            f"No se encontró la base de alumnos: {RUTA_ALUMNOS}"
-        )
-
-    with RUTA_ALUMNOS.open(
-        mode="r",
-        encoding="utf-8-sig",
-        newline="",
-    ) as archivo:
-
-        lector = csv.DictReader(archivo)
-
-        return list(lector)
-
-
-# ============================================================
-# BÚSQUEDA DE ALUMNO
-# ============================================================
-
 def buscar_alumno(curso_id, numero_lista):
-    """
-    Busca un alumno exclusivamente dentro del curso indicado.
 
-    No utiliza nombres para realizar la búsqueda inicial.
-    """
+    conexion = obtener_conexion()
 
-    alumnos = cargar_alumnos()
+    with conexion.session as sesion:
 
-    for alumno in alumnos:
+        resultado = sesion.execute(
+            text(
+                """
+                SELECT
+                    alumno_id,
+                    numero_lista,
+                    nombre,
+                    apellido,
+                    curso,
+                    activo
+                FROM alumnos
+                WHERE curso = :curso
+                  AND numero_lista = :numero
+                LIMIT 1
+                """
+            ),
+            {
+                "curso": curso_id,
+                "numero": int(numero_lista),
+            },
+        ).mappings().first()
 
-        if alumno["curso"] != curso_id:
-            continue
-
-        try:
-            numero_alumno = int(alumno["numero_lista"])
-        except (ValueError, TypeError):
-            continue
-
-        if numero_alumno == int(numero_lista):
-            return alumno
-
-    return None
-
-
-# ============================================================
-# VALIDACIÓN DE IDENTIDAD
-# ============================================================
-
-def validar_alumno(curso_id, numero_lista, nombre_ingresado):
-    """
-    Valida la identidad mediante:
-
-        curso
-        + número de lista
-        + nombre
-
-    Devuelve el diccionario del alumno si la identidad
-    es correcta.
-
-    Devuelve None si la validación falla.
-    """
-
-    if not curso_id:
+    if resultado is None:
         return None
 
-    if numero_lista is None:
-        return None
+    return dict(resultado)
 
-    if not nombre_ingresado:
+
+def validar_alumno(
+    curso_id,
+    numero_lista,
+    nombre_ingresado,
+):
+
+    if (
+        not curso_id
+        or numero_lista is None
+        or not nombre_ingresado
+    ):
         return None
 
     try:
         numero_lista = int(numero_lista)
+
     except (ValueError, TypeError):
         return None
 
@@ -142,11 +83,7 @@ def validar_alumno(curso_id, numero_lista, nombre_ingresado):
     if alumno is None:
         return None
 
-    activo = normalizar_texto(
-        alumno.get("activo", "")
-    )
-
-    if activo not in ("true", "1", "si", "sí"):
+    if not alumno["activo"]:
         return None
 
     nombre_real = normalizar_texto(
@@ -162,17 +99,34 @@ def validar_alumno(curso_id, numero_lista, nombre_ingresado):
 
     return alumno
 
+
 def obtener_alumno_por_id(alumno_id):
-    """
-    Busca un alumno utilizando su identificador
-    interno de CSC Lab.
-    """
 
-    alumnos = cargar_alumnos()
+    conexion = obtener_conexion()
 
-    for alumno in alumnos:
+    with conexion.session as sesion:
 
-        if alumno["alumno_id"] == alumno_id:
-            return alumno
+        resultado = sesion.execute(
+            text(
+                """
+                SELECT
+                    alumno_id,
+                    numero_lista,
+                    nombre,
+                    apellido,
+                    curso,
+                    activo
+                FROM alumnos
+                WHERE alumno_id = :alumno_id
+                LIMIT 1
+                """
+            ),
+            {
+                "alumno_id": alumno_id,
+            },
+        ).mappings().first()
 
-    return None
+    if resultado is None:
+        return None
+
+    return dict(resultado)

@@ -1,99 +1,48 @@
-# ============================================================
-# CSC LAB
-# Gestión de equipos
-# ============================================================
+from sqlalchemy import text
 
-import sqlite3
-from pathlib import Path
-
-
-RUTA_PROYECTO = Path(__file__).resolve().parent.parent
-RUTA_DB = RUTA_PROYECTO / "data" / "csc_lab.db"
-
-
-def obtener_conexion():
-    return sqlite3.connect(RUTA_DB)
+from core.base_datos import obtener_conexion
 
 
 def inicializar_equipos():
     """
-    Crea las tablas necesarias para gestionar
-    equipos y membresías.
+    PostgreSQL ya posee el esquema.
+    Se conserva esta función para mantener
+    compatible app.py.
     """
-
-    with obtener_conexion() as conexion:
-
-        conexion.execute(
-            """
-            CREATE TABLE IF NOT EXISTS equipos (
-                equipo_id TEXT PRIMARY KEY,
-                curso TEXT NOT NULL,
-                numero_equipo INTEGER NOT NULL,
-                nombre_equipo TEXT NOT NULL,
-                nombre_empresa TEXT,
-                activo INTEGER NOT NULL DEFAULT 1,
-
-                UNIQUE (curso, numero_equipo)
-            )
-            """
-        )
-
-        conexion.execute(
-            """
-            CREATE TABLE IF NOT EXISTS miembros_equipo (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                equipo_id TEXT NOT NULL,
-                alumno_id TEXT NOT NULL,
-                fecha_desde TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                fecha_hasta TEXT,
-                activo INTEGER NOT NULL DEFAULT 1,
-
-                FOREIGN KEY (equipo_id)
-                    REFERENCES equipos(equipo_id)
-            )
-            """
-        )
-
-        conexion.execute(
-            """
-            CREATE UNIQUE INDEX IF NOT EXISTS
-            idx_alumno_equipo_activo
-            ON miembros_equipo(alumno_id)
-            WHERE activo = 1
-            """
-        )
-
-        conexion.commit()
+    return
 
 
 def obtener_equipo_alumno(alumno_id):
-    """
-    Obtiene el equipo activo al que pertenece
-    actualmente un alumno.
-    """
 
-    with obtener_conexion() as conexion:
+    conexion = obtener_conexion()
 
-        conexion.row_factory = sqlite3.Row
+    with conexion.session as sesion:
 
-        resultado = conexion.execute(
-            """
-            SELECT
-                e.equipo_id,
-                e.curso,
-                e.numero_equipo,
-                e.nombre_equipo,
-                e.nombre_empresa
-            FROM miembros_equipo AS m
-            JOIN equipos AS e
-                ON e.equipo_id = m.equipo_id
-            WHERE m.alumno_id = ?
-              AND m.activo = 1
-              AND e.activo = 1
-            LIMIT 1
-            """,
-            (alumno_id,),
-        ).fetchone()
+        resultado = sesion.execute(
+            text(
+                """
+                SELECT
+                    e.equipo_id,
+                    e.curso,
+                    e.numero_equipo,
+                    e.nombre_equipo,
+                    e.nombre_empresa
+                FROM miembros_equipo AS m
+
+                JOIN equipos AS e
+                    ON e.equipo_id = m.equipo_id
+
+                WHERE m.alumno_id = :alumno_id
+                  AND m.activo = TRUE
+                  AND e.activo = TRUE
+
+                LIMIT 1
+                """
+            ),
+            {
+                "alumno_id": alumno_id,
+            },
+        ).mappings().first()
 
     if resultado is None:
         return None
@@ -102,27 +51,24 @@ def obtener_equipo_alumno(alumno_id):
 
 
 def obtener_integrantes_equipo(equipo_id):
-    """
-    Devuelve los alumno_id de todos los integrantes
-    activos de un equipo.
-    """
 
-    with obtener_conexion() as conexion:
+    conexion = obtener_conexion()
 
-        conexion.row_factory = sqlite3.Row
+    with conexion.session as sesion:
 
-        resultados = conexion.execute(
-            """
-            SELECT alumno_id
-            FROM miembros_equipo
-            WHERE equipo_id = ?
-              AND activo = 1
-            ORDER BY alumno_id
-            """,
-            (equipo_id,),
-        ).fetchall()
+        resultados = sesion.execute(
+            text(
+                """
+                SELECT alumno_id
+                FROM miembros_equipo
+                WHERE equipo_id = :equipo_id
+                  AND activo = TRUE
+                ORDER BY alumno_id
+                """
+            ),
+            {
+                "equipo_id": equipo_id,
+            },
+        ).scalars().all()
 
-    return [
-        fila["alumno_id"]
-        for fila in resultados
-    ]
+    return list(resultados)
