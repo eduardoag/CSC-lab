@@ -32,6 +32,14 @@ from core.cultura import (
     inicializar_cultura,
 )
 
+from componentes.equipo_alumno import (
+    mostrar_equipo_alumno,
+)
+
+from core.equipos import (
+    inicializar_equipos,
+)
+
 # ============================================================
 # CONFIGURACIÓN DE PÁGINA
 # ============================================================
@@ -50,6 +58,7 @@ st.set_page_config(
 
 inicializar_base_datos()
 inicializar_cultura()
+inicializar_equipos()
 expirar_sesiones_abandonadas()
 
 cargar_css()
@@ -233,6 +242,10 @@ Ahora estamos trabajando con:<br><br>
                 acepto_reglas = alumno_acepto_reglas(
                     alumno["alumno_id"]
                 )
+                
+                mostrar_equipo_alumno(
+                    alumno
+                )
 
                 if not acepto_reglas:
 
@@ -277,6 +290,10 @@ Ahora estamos trabajando con:<br><br>
                     )
 
             else:
+                
+                mostrar_equipo_alumno(
+                    alumno
+                )
 
                 st.info(
                     "Tu espacio de TIC estará disponible aquí."

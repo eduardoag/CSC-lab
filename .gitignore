@@ -41,3 +41,6 @@ Thumbs.db
 # Archivos temporales
 *.log
 *.tmp
+
+# Importaciones con datos académicos privados
+data/importaciones/

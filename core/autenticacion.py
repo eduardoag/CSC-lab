@@ -161,3 +161,18 @@ def validar_alumno(curso_id, numero_lista, nombre_ingresado):
         return None
 
     return alumno
+
+def obtener_alumno_por_id(alumno_id):
+    """
+    Busca un alumno utilizando su identificador
+    interno de CSC Lab.
+    """
+
+    alumnos = cargar_alumnos()
+
+    for alumno in alumnos:
+
+        if alumno["alumno_id"] == alumno_id:
+            return alumno
+
+    return None
