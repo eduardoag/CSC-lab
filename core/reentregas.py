@@ -5,43 +5,32 @@ from sqlalchemy import text
 from core.base_datos import obtener_conexion
 
 
-ESTADOS_REVISION = {
-    "REQUIERE_AJUSTES",
-    "APROBADA",
-}
-
-
-def revisar_mision(
+def reenviar_mision(
     alumno_id,
-    curso,
     mision_id,
-    nuevo_estado,
-    devolucion,
+    descripcion_cambios,
 ):
+    """
+    Registra una reentrega después de una devolución.
 
-    if nuevo_estado not in ESTADOS_REVISION:
+    Actualiza el progreso y agrega un evento
+    a la bitácora dentro de una única transacción.
+    """
+
+    descripcion_cambios = descripcion_cambios.strip()
+
+    if not descripcion_cambios:
         raise ValueError(
-            f"Estado de revisión no válido: {nuevo_estado}"
-        )
-
-    devolucion = devolucion.strip()
-
-    if not devolucion:
-        raise ValueError(
-            "La devolución docente no puede estar vacía."
+            "El alumno debe describir los cambios realizados."
         )
 
     conexion = obtener_conexion()
 
     with conexion.session as sesion:
 
-        # --------------------------------------------------
-        # Verificar que la misión esté esperando revisión
-        # --------------------------------------------------
-
         progreso = sesion.execute(
             text("""
-                SELECT estado
+                SELECT estado, curso
                 FROM progreso_misiones
                 WHERE alumno_id = :alumno_id
                   AND mision_id = :mision_id
@@ -58,41 +47,30 @@ def revisar_mision(
                 "No existe progreso para esta misión."
             )
 
-        if progreso["estado"] != "PENDIENTE_REVISION":
+        if progreso["estado"] != "REQUIERE_AJUSTES":
             raise ValueError(
-                "La misión ya no está pendiente de revisión."
+                "La misión no está habilitada para reentrega."
             )
-
-        # --------------------------------------------------
-        # Actualizar estado actual
-        # --------------------------------------------------
 
         sesion.execute(
             text("""
                 UPDATE progreso_misiones
-                SET estado = :estado,
-                    devolucion_docente = :devolucion,
-                    fecha_revision = CURRENT_TIMESTAMP,
+                SET estado = 'PENDIENTE_REVISION',
+                    fecha_envio = CURRENT_TIMESTAMP,
                     fecha_ultima_actividad = CURRENT_TIMESTAMP
                 WHERE alumno_id = :alumno_id
                   AND mision_id = :mision_id
             """),
             {
-                "estado": nuevo_estado,
-                "devolucion": devolucion,
                 "alumno_id": alumno_id,
                 "mision_id": mision_id,
             },
         )
 
-        # --------------------------------------------------
-        # Registrar intervención docente en la bitácora
-        # --------------------------------------------------
-
         detalle = {
-            "estado_anterior": "PENDIENTE_REVISION",
-            "estado_nuevo": nuevo_estado,
-            "devolucion": devolucion,
+            "estado_anterior": "REQUIERE_AJUSTES",
+            "estado_nuevo": "PENDIENTE_REVISION",
+            "descripcion_cambios": descripcion_cambios,
         }
 
         sesion.execute(
@@ -108,13 +86,13 @@ def revisar_mision(
                     :alumno_id,
                     :curso,
                     :mision_id,
-                    'REVISION_DOCENTE',
+                    'REENTREGA_MISION',
                     CAST(:detalle AS JSONB)
                 )
             """),
             {
                 "alumno_id": alumno_id,
-                "curso": curso,
+                "curso": progreso["curso"],
                 "mision_id": mision_id,
                 "detalle": json.dumps(
                     detalle,
@@ -123,5 +101,4 @@ def revisar_mision(
             },
         )
 
-        # Un único commit para ambas operaciones.
         sesion.commit()

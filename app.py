@@ -122,7 +122,6 @@ Ahora estamos trabajando con:<br><br>
         unsafe_allow_html=True,
     )
 
-
     # ========================================================
     # ALUMNO SIN IDENTIFICAR
     # ========================================================
@@ -184,7 +183,6 @@ Ahora estamos trabajando con:<br><br>
                     "Revisá tu número de lista y tu nombre."
                 )
 
-
     # ========================================================
     # ALUMNO IDENTIFICADO
     # ========================================================
@@ -211,7 +209,6 @@ Ahora estamos trabajando con:<br><br>
 
             st.rerun()
 
-
         # ----------------------------------------------------
         # SESIÓN VÁLIDA
         # ----------------------------------------------------
@@ -232,6 +229,8 @@ Ahora estamos trabajando con:<br><br>
                 alumno
             )
 
+            mostrar_equipo_alumno(alumno)
+
             # ========================================================
             # CULTURA DEL CONSTRUCTOR
             # Sólo corresponde a 3.º año
@@ -241,10 +240,6 @@ Ahora estamos trabajando con:<br><br>
 
                 acepto_reglas = alumno_acepto_reglas(
                     alumno["alumno_id"]
-                )
-                
-                mostrar_equipo_alumno(
-                    alumno
                 )
 
                 if not acepto_reglas:
@@ -290,10 +285,6 @@ Ahora estamos trabajando con:<br><br>
                     )
 
             else:
-                
-                mostrar_equipo_alumno(
-                    alumno
-                )
 
                 st.info(
                     "Tu espacio de TIC estará disponible aquí."
@@ -335,7 +326,6 @@ else:
 
     st.session_state.alumno = None
     st.session_state.sesion_id = None
-
 
     # --------------------------------------------------------
     # PANTALLA DE LABORATORIO CERRADO
