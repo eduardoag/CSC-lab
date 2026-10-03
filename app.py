@@ -40,6 +40,16 @@ from core.equipos import (
     inicializar_equipos,
 )
 
+from core.acceso_docente import (
+    autenticar_docente,
+    cerrar_sesion_docente,
+    docente_autenticado,
+)
+
+from componentes.dashboard_docente import (
+    mostrar_dashboard_docente,
+)
+
 # ============================================================
 # CONFIGURACIÓN DE PÁGINA
 # ============================================================
@@ -75,6 +85,187 @@ if "alumno" not in st.session_state:
 if "sesion_id" not in st.session_state:
     st.session_state.sesion_id = None
 
+if "vista_alumno_docente" not in st.session_state:
+    st.session_state.vista_alumno_docente = False
+
+if "preview_alumno" not in st.session_state:
+    st.session_state.preview_alumno = None
+
+if "modo_demo" not in st.session_state:
+    st.session_state.modo_demo = False
+
+# ============================================================
+# ACCESO DOCENTE
+# ============================================================
+
+if docente_autenticado():
+
+    # ========================================================
+    # VISTA PREVIA COMO ALUMNO
+    # ========================================================
+
+    if (
+        st.session_state.vista_alumno_docente
+        and st.session_state.preview_alumno is not None
+    ):
+
+        alumno_preview = st.session_state.preview_alumno
+
+        if st.session_state.modo_demo:
+
+            st.warning(
+            "🧪 LABORATORIO DEMO · "
+            "Entorno técnico con datos aislados."
+            )
+
+        else:
+
+            st.warning(
+            "👁️ VISTA DOCENTE COMO ALUMNO · "
+            "Modo de inspección · Sin escritura."
+            )
+
+        if st.session_state.modo_demo:
+            st.write(
+                f"Probando CSC Lab como "
+                f"**{alumno_preview['nombre']} "
+                f"{alumno_preview['apellido']} · "
+                f"{alumno_preview['curso']}**"
+            )
+        else:
+            st.write(
+                f"Visualizando como "
+                f"**#{alumno_preview['numero_lista']} · "
+                f"{alumno_preview['nombre']} "
+                f"{alumno_preview['apellido']} · "
+                f"{alumno_preview['curso']}**"
+            )
+
+        if st.button(
+            "← Volver al Dashboard Docente",
+            use_container_width=True,
+            key="salir_preview_alumno",
+        ):
+
+            st.session_state.vista_alumno_docente = False
+            st.session_state.preview_alumno = None
+            st.session_state.modo_demo = False
+
+            st.rerun()
+
+        st.divider()
+
+        mostrar_perfil_alumno(
+            alumno_preview
+        )
+
+        if st.session_state.modo_demo:
+            st.info(
+                "🧪 Alumno técnico DEMO · "
+                "sin equipo asignado."
+            )
+        else:
+            mostrar_equipo_alumno(
+                alumno_preview
+            )
+
+        # ----------------------------------------------------
+        # CONTENIDO PEDAGÓGICO
+        # ----------------------------------------------------
+
+        if alumno_preview["curso"] in ("3A", "3B"):
+
+            st.success(
+                "🏗️ Sos parte del programa Constructores."
+            )
+
+            st.markdown(
+                "### 🎯 Misión 01 · ENCONTRAR"
+            )
+
+            st.write(
+                "Encontrar un problema real "
+                "que merezca ser resuelto."
+            )
+
+            st.info(
+                "La primera misión está a punto "
+                "de comenzar."
+            )
+
+        else:
+
+            st.info(
+                "Tu espacio de TIC estará disponible aquí."
+            )
+
+        st.stop()
+
+    # ========================================================
+    # DASHBOARD DOCENTE
+    # ========================================================
+
+    st.success("👨‍🏫 Modo docente activo")
+
+    col_info, col_salir = st.columns([3, 1])
+
+    with col_info:
+
+        st.caption(
+            "Acceso docente · "
+            "independiente del horario de clases"
+        )
+
+    with col_salir:
+
+        if st.button(
+            "Cerrar sesión docente",
+            use_container_width=True,
+            key="cerrar_sesion_docente",
+        ):
+
+            cerrar_sesion_docente()
+
+            st.session_state.vista_alumno_docente = False
+            st.session_state.preview_alumno = None
+            st.session_state.modo_demo = False
+
+            st.rerun()
+
+    st.divider()
+
+    mostrar_dashboard_docente()
+
+    st.stop()
+
+# ============================================================
+# ACCESO DOCENTE
+# Visible con el laboratorio abierto o cerrado
+# ============================================================
+
+with st.expander("👨‍🏫 Acceso docente"):
+
+    with st.form("login_docente"):
+
+        password_docente = st.text_input(
+            "Contraseña docente",
+            type="password",
+        )
+
+        ingresar_docente = st.form_submit_button(
+            "Ingresar",
+            use_container_width=True,
+        )
+
+    if ingresar_docente:
+
+        if autenticar_docente(password_docente):
+            st.rerun()
+
+        else:
+            st.error(
+                "No se pudo validar el acceso docente."
+            )
 
 # ============================================================
 # ESTADO ACTUAL DEL LABORATORIO
@@ -350,7 +541,6 @@ Nos volvemos a encontrar en el aula.
         "Ese tiempo es para disfrutar de la familia, "
         "los amigos y todo lo que también nos enseña la vida. 🌱"
     )
-
 
 # ============================================================
 # INFORMACIÓN DE ESTADO

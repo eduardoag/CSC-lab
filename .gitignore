@@ -44,3 +44,6 @@ Thumbs.db
 
 # Importaciones con datos académicos privados
 data/importaciones/
+
+# Backups locales
+*_backup.py
