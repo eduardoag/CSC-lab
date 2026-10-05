@@ -50,6 +50,10 @@ from componentes.dashboard_docente import (
     mostrar_dashboard_docente,
 )
 
+from misiones.tercero.mision_01_encontrar import (
+    mostrar_observar,
+)
+
 # ============================================================
 # CONFIGURACIÓN DE PÁGINA
 # ============================================================
@@ -179,18 +183,10 @@ if docente_autenticado():
                 "🏗️ Sos parte del programa Constructores."
             )
 
-            st.markdown(
-                "### 🎯 Misión 01 · ENCONTRAR"
-            )
-
-            st.write(
-                "Encontrar un problema real "
-                "que merezca ser resuelto."
-            )
-
-            st.info(
-                "La primera misión está a punto "
-                "de comenzar."
+            mostrar_observar(
+                alumno_preview,
+                modo_demo=st.session_state.modo_demo,
+                solo_lectura=not st.session_state.modo_demo,
             )
 
         else:
@@ -461,18 +457,10 @@ Ahora estamos trabajando con:<br><br>
                         "Constructores."
                     )
 
-                    st.markdown(
-                        "### 🎯 Misión 01 · ENCONTRAR"
-                    )
-
-                    st.write(
-                        "Encontrar un problema real "
-                        "que merezca ser resuelto."
-                    )
-
-                    st.info(
-                        "La primera misión está a punto "
-                        "de comenzar."
+                    mostrar_observar(
+                        alumno,
+                        modo_demo=False,
+                        solo_lectura=False,
                     )
 
             else:

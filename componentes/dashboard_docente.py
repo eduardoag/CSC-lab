@@ -51,10 +51,14 @@ def obtener_misiones(curso_id):
 
         resultados = sesion.execute(
             text("""
-                SELECT DISTINCT mision_id
-                FROM progreso_misiones
-                WHERE curso = :curso
-                ORDER BY mision_id
+                SELECT DISTINCT p.mision_id
+                FROM progreso_misiones AS p
+                JOIN alumnos AS a
+                  ON a.alumno_id = p.alumno_id
+                WHERE p.curso = :curso
+                  AND a.activo = TRUE
+                  AND a.tipo_alumno = 'REAL'
+                ORDER BY p.mision_id
             """),
             {"curso": curso_id},
         ).scalars().all()
@@ -82,12 +86,16 @@ def obtener_resumen(curso_id, mision_id):
         filas = sesion.execute(
             text("""
                 SELECT
-                    estado,
+                    p.estado,
                     COUNT(*)
-                FROM progreso_misiones
-                WHERE curso = :curso
-                  AND mision_id = :mision
-                GROUP BY estado
+                FROM progreso_misiones AS p
+                JOIN alumnos AS a
+                  ON a.alumno_id = p.alumno_id
+                WHERE p.curso = :curso
+                  AND p.mision_id = :mision
+                  AND a.activo = TRUE
+                  AND a.tipo_alumno = 'REAL'
+                GROUP BY p.estado
             """),
             {
                 "curso": curso_id,
@@ -171,6 +179,7 @@ def obtener_bitacora(alumno_id, mision_id):
         resultados = sesion.execute(
             text("""
                 SELECT
+                    evento_id,
                     fecha_hora,
                     tipo_evento,
                     etapa_id,
@@ -178,7 +187,7 @@ def obtener_bitacora(alumno_id, mision_id):
                 FROM eventos_aprendizaje
                 WHERE alumno_id = :alumno_id
                   AND mision_id = :mision_id
-                ORDER BY fecha_hora
+                ORDER BY fecha_hora, evento_id
             """),
             {
                 "alumno_id": alumno_id,

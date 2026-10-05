@@ -37,10 +37,13 @@ def buscar_alumno(curso_id, numero_lista):
                     nombre,
                     apellido,
                     curso,
-                    activo
+                    activo,
+                    tipo_alumno
                 FROM alumnos
                 WHERE curso = :curso
                   AND numero_lista = :numero
+                  AND activo = TRUE
+                  AND tipo_alumno = 'REAL'
                 LIMIT 1
                 """
             ),
