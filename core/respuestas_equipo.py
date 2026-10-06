@@ -5,6 +5,7 @@ from sqlalchemy.exc import IntegrityError
 
 from core.base_datos import obtener_conexion
 from core.equipos_misiones import validar_contexto_equipo_en_sesion
+from core.progreso_equipo import verificar_mision_equipo_editable_en_sesion
 
 
 TIPOS_RESPUESTA_VALIDOS = {
@@ -140,6 +141,15 @@ def guardar_borrador_equipo_en_sesion(
     tipo = _normalizar_tipo(tipo_respuesta)
     contenido_normalizado = _contenido_json(contenido)
     contenido_serializado = json.dumps(contenido_normalizado, ensure_ascii=False)
+
+    # Seguridad pedagógica: sólo se puede escribir si la misión del equipo
+    # existe y su estado actual admite edición.
+    verificar_mision_equipo_editable_en_sesion(
+        sesion,
+        contexto["alumno_id"],
+        contexto["equipo_id"],
+        mision_id,
+    )
 
     existente = sesion.execute(
         text("""
