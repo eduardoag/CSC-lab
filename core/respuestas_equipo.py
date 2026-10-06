@@ -149,6 +149,7 @@ def guardar_borrador_equipo_en_sesion(
         contexto["alumno_id"],
         contexto["equipo_id"],
         mision_id,
+        bloquear=True,
     )
 
     existente = sesion.execute(
