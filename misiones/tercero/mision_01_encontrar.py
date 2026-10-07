@@ -186,6 +186,21 @@ def _etiqueta_codigo(opciones, codigo):
     return mapa.get(codigo, codigo)
 
 
+def _clave_mensaje_flash(equipo_id):
+    return f"m01_flash_{equipo_id}"
+
+
+def _guardar_mensaje_flash(equipo_id, mensaje):
+    st.session_state[_clave_mensaje_flash(equipo_id)] = mensaje
+
+
+def _mostrar_mensaje_flash(equipo_id):
+    clave = _clave_mensaje_flash(equipo_id)
+    mensaje = st.session_state.pop(clave, None)
+    if mensaje:
+        st.success(mensaje)
+
+
 def _guardar_campo_equipo(
     alumno_id,
     equipo_id,
@@ -463,18 +478,21 @@ def _mostrar_observar_equipo(alumno_id, equipo_id, *, bloqueado=False):
             ),
             height=150,
             disabled=bloqueado,
+            key=f"m01_observar_observacion_{equipo_id}",
         )
         nuevo_donde = st.text_input(
             "¿Dónde ocurre?",
             value=_texto(donde),
             placeholder="Por ejemplo: en el aula, en casa, en el barrio...",
             disabled=bloqueado,
+            key=f"m01_observar_donde_{equipo_id}",
         )
         nuevo_cuando = st.text_input(
             "¿Cuándo ocurre?",
             value=_texto(cuando),
             placeholder="¿En qué momento o situación aparece?",
             disabled=bloqueado,
+            key=f"m01_observar_cuando_{equipo_id}",
         )
 
         guardar = st.form_submit_button(
@@ -503,7 +521,10 @@ def _mostrar_observar_equipo(alumno_id, equipo_id, *, bloqueado=False):
             ],
         )
         _actualizar_etapa(alumno_id, equipo_id, "OBSERVAR")
-        st.success("✓ La observación del equipo quedó guardada.")
+        _guardar_mensaje_flash(
+            equipo_id,
+            "✓ La observación del equipo quedó guardada.",
+        )
         st.rerun()
 
 
@@ -592,7 +613,10 @@ def _mostrar_comprender(alumno_id, equipo_id, *, bloqueado=False):
             ],
         )
         _actualizar_etapa(alumno_id, equipo_id, "COMPRENDER")
-        st.success("✓ La comprensión del problema quedó guardada.")
+        _guardar_mensaje_flash(
+            equipo_id,
+            "✓ La comprensión del problema quedó guardada.",
+        )
         st.rerun()
 
 
@@ -686,7 +710,10 @@ def _mostrar_investigar(alumno_id, equipo_id, *, bloqueado=False):
             ],
         )
         _actualizar_etapa(alumno_id, equipo_id, "INVESTIGAR")
-        st.success("✓ La investigación del equipo quedó guardada.")
+        _guardar_mensaje_flash(
+            equipo_id,
+            "✓ La investigación del equipo quedó guardada.",
+        )
         st.rerun()
 
 
@@ -795,7 +822,10 @@ def _mostrar_evidenciar(alumno_id, equipo_id, *, bloqueado=False):
             ],
         )
         _actualizar_etapa(alumno_id, equipo_id, "EVIDENCIAR")
-        st.success("✓ Las tres evidencias quedaron guardadas.")
+        _guardar_mensaje_flash(
+            equipo_id,
+            "✓ Las tres evidencias quedaron guardadas.",
+        )
         st.rerun()
 
 
@@ -883,7 +913,10 @@ def _mostrar_formular(alumno_id, equipo_id, *, bloqueado=False):
             ],
         )
         _actualizar_etapa(alumno_id, equipo_id, "FORMULAR")
-        st.success("✓ La formulación del problema quedó guardada.")
+        _guardar_mensaje_flash(
+            equipo_id,
+            "✓ La formulación del problema quedó guardada.",
+        )
         st.rerun()
 
 
@@ -1034,9 +1067,12 @@ def _mostrar_ficha(alumno_id, equipo_id, progreso, *, bloqueado=False):
         )
 
         version = resultado["version_entrega"]
-        st.success(
-            f"✓ Ficha V{version} enviada al profesor. "
-            "La entrega quedó congelada como evidencia histórica."
+        _guardar_mensaje_flash(
+            equipo_id,
+            (
+                f"✓ Ficha V{version} enviada al profesor. "
+                "La entrega quedó congelada como evidencia histórica."
+            ),
         )
         st.rerun()
 
@@ -1171,6 +1207,7 @@ def mostrar_observar(alumno, *, modo_demo=False, solo_lectura=False):
         return
 
     _mostrar_cabecera(equipo, progreso)
+    _mostrar_mensaje_flash(equipo_id)
 
     estado = progreso["estado"]
     bloqueado_equipo = solo_lectura or estado in ESTADOS_BLOQUEADOS
