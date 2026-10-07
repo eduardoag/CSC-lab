@@ -50,6 +50,39 @@ def _contenido_json(contenido):
     return normalizado
 
 
+
+def _registrar_historial_borrador_en_sesion(
+    sesion,
+    respuesta_equipo_id,
+    revision_borrador,
+    contenido,
+    actor_alumno_id,
+):
+    """Registra una fotografía inmutable del borrador sin commit ni rollback."""
+    sesion.execute(
+        text("""
+            INSERT INTO historial_borradores_equipo_mision (
+                respuesta_equipo_id,
+                revision_borrador,
+                contenido,
+                actor_alumno_id
+            )
+            VALUES (
+                :respuesta_equipo_id,
+                :revision_borrador,
+                CAST(:contenido AS JSONB),
+                :actor_alumno_id
+            )
+        """),
+        {
+            "respuesta_equipo_id": respuesta_equipo_id,
+            "revision_borrador": revision_borrador,
+            "contenido": json.dumps(contenido, ensure_ascii=False),
+            "actor_alumno_id": actor_alumno_id,
+        },
+    )
+
+
 def obtener_respuesta_equipo_en_sesion(
     sesion, alumno_id, equipo_id, mision_id, etapa_id, campo_id
 ):
@@ -210,6 +243,14 @@ def guardar_borrador_equipo_en_sesion(
                         "actor": contexto["alumno_id"],
                     },
                 ).mappings().one()
+
+                _registrar_historial_borrador_en_sesion(
+                    sesion=sesion,
+                    respuesta_equipo_id=creada["respuesta_equipo_id"],
+                    revision_borrador=creada["revision_borrador"],
+                    contenido=creada["contenido_actual"],
+                    actor_alumno_id=contexto["alumno_id"],
+                )
         except IntegrityError as exc:
             raise ConflictoBorradorEquipoError(
                 "Otro integrante creó este borrador al mismo tiempo. "
@@ -260,6 +301,14 @@ def guardar_borrador_equipo_en_sesion(
             "La respuesta fue modificada por otro integrante del equipo. "
             "Actualizá la información antes de volver a guardar."
         )
+
+    _registrar_historial_borrador_en_sesion(
+        sesion=sesion,
+        respuesta_equipo_id=actualizada["respuesta_equipo_id"],
+        revision_borrador=actualizada["revision_borrador"],
+        contenido=actualizada["contenido_actual"],
+        actor_alumno_id=contexto["alumno_id"],
+    )
 
     return dict(actualizada)
 
