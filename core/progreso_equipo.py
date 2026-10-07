@@ -2,6 +2,7 @@ from sqlalchemy import text
 
 from core.base_datos import obtener_conexion
 from core.equipos_misiones import validar_contexto_equipo_en_sesion
+from core.prerrequisitos_misiones import validar_prerrequisitos_equipo_en_sesion
 
 
 ESTADOS_PERSISTIDOS = {
@@ -74,7 +75,12 @@ def obtener_progreso_equipo_en_sesion(sesion, alumno_id, equipo_id, mision_id):
 
 
 def iniciar_mision_equipo_en_sesion(
-    sesion, alumno_id, equipo_id, mision_id, etapa_inicial
+    sesion,
+    alumno_id,
+    equipo_id,
+    mision_id,
+    etapa_inicial,
+    prerrequisitos=(),
 ):
     """
     Inicia una misión grupal SIN hacer commit.
@@ -84,6 +90,13 @@ def iniciar_mision_equipo_en_sesion(
     contexto = validar_contexto_equipo_en_sesion(sesion, alumno_id, equipo_id)
     mision_id = _normalizar_id(mision_id, "mision_id")
     etapa_inicial = _normalizar_id(etapa_inicial, "etapa_inicial")
+
+    validar_prerrequisitos_equipo_en_sesion(
+        sesion,
+        contexto["equipo_id"],
+        mision_id,
+        prerrequisitos,
+    )
 
     creada = sesion.execute(
         text("""
@@ -257,12 +270,23 @@ def obtener_progreso_equipo(alumno_id, equipo_id, mision_id):
         )
 
 
-def iniciar_mision_equipo(alumno_id, equipo_id, mision_id, etapa_inicial):
+def iniciar_mision_equipo(
+    alumno_id,
+    equipo_id,
+    mision_id,
+    etapa_inicial,
+    prerrequisitos=(),
+):
     conexion = obtener_conexion()
     with conexion.session as sesion:
         try:
             resultado = iniciar_mision_equipo_en_sesion(
-                sesion, alumno_id, equipo_id, mision_id, etapa_inicial
+                sesion,
+                alumno_id,
+                equipo_id,
+                mision_id,
+                etapa_inicial,
+                prerrequisitos,
             )
             sesion.commit()
             return resultado
