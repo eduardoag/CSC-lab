@@ -54,6 +54,8 @@ from misiones.tercero.mision_01_encontrar import (
     mostrar_observar,
 )
 
+from misiones.quinto.mision_01_descubrir import mostrar_mision_01_quinto
+
 # ============================================================
 # CONFIGURACIÓN DE PÁGINA
 # ============================================================
@@ -189,10 +191,11 @@ if docente_autenticado():
                 solo_lectura=not st.session_state.modo_demo,
             )
 
-        else:
-
-            st.info(
-                "Tu espacio de TIC estará disponible aquí."
+        elif alumno_preview["curso"] in ("5A", "5B"):
+            mostrar_mision_01_quinto(
+                alumno_preview,
+                modo_demo=st.session_state.modo_demo,
+                solo_lectura=not st.session_state.modo_demo,
             )
 
         st.stop()
@@ -463,10 +466,11 @@ Ahora estamos trabajando con:<br><br>
                         solo_lectura=False,
                     )
 
-            else:
-
-                st.info(
-                    "Tu espacio de TIC estará disponible aquí."
+            elif alumno["curso"] in ("5A", "5B"):
+                mostrar_mision_01_quinto(
+                    alumno,
+                    modo_demo=False,
+                    solo_lectura=False,
                 )
 
             if st.button(

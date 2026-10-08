@@ -259,18 +259,52 @@ def _clave_navegacion(equipo_id):
     return f"m01_etapa_ui_{equipo_id}"
 
 
+def _clave_selector(equipo_id):
+    return f"m01_selector_etapas_{equipo_id}"
+
+
+def _clave_navegacion_pendiente(equipo_id):
+    return f"m01_etapa_pendiente_{equipo_id}"
+
+
 def _etapa_ui(equipo_id, progreso):
+    """Sincroniza ambos controles ANTES de crear el widget selector."""
     clave = _clave_navegacion(equipo_id)
-    if clave not in st.session_state:
-        etapa = progreso.get("etapa_actual") or "PREPARARSE"
-        st.session_state[clave] = (
-            etapa if etapa in ORDEN_ETAPAS else "PREPARARSE"
-        )
+    clave_selector = _clave_selector(equipo_id)
+    pendiente = st.session_state.pop(_clave_navegacion_pendiente(equipo_id), None)
+
+    if pendiente in ORDEN_ETAPAS:
+        st.session_state[clave] = pendiente
+        st.session_state[clave_selector] = pendiente
+    else:
+        etapa = st.session_state.get(clave)
+        if etapa not in ORDEN_ETAPAS:
+            etapa = progreso.get("etapa_actual") or "PREPARARSE"
+            if etapa not in ORDEN_ETAPAS:
+                etapa = "PREPARARSE"
+            st.session_state[clave] = etapa
+        if st.session_state.get(clave_selector) not in ORDEN_ETAPAS:
+            st.session_state[clave_selector] = etapa
+
     return st.session_state[clave]
 
 
+def _al_cambiar_selector(equipo_id):
+    """El callback se ejecuta antes del nuevo render de Streamlit."""
+    elegida = st.session_state[_clave_selector(equipo_id)]
+    if elegida in ORDEN_ETAPAS:
+        st.session_state[_clave_navegacion(equipo_id)] = elegida
+
+
 def _ir_a(equipo_id, etapa_id):
-    st.session_state[_clave_navegacion(equipo_id)] = etapa_id
+    """Los botones solicitan el cambio para el próximo render.
+
+    No se modifica aquí la clave del selectbox: el widget ya fue creado
+    en esta ejecución y Streamlit no permite alterar su estado después.
+    """
+    if etapa_id not in ORDEN_ETAPAS:
+        return
+    st.session_state[_clave_navegacion_pendiente(equipo_id)] = etapa_id
     st.rerun()
 
 
@@ -1232,6 +1266,20 @@ def mostrar_observar(alumno, *, modo_demo=False, solo_lectura=False):
     st.markdown(
         f"#### {ETIQUETAS_ETAPA[etapa]} "
         f"· paso {ORDEN_ETAPAS.index(etapa) + 1} de {len(ORDEN_ETAPAS)}"
+    )
+
+    # Navegación visible antes del formulario: permite descubrir las etapas
+    # incluso en pantallas pequeñas, sin cambiar datos ni prerrequisitos.
+    st.caption("Elegí una etapa para continuar. Guardá las respuestas antes de cambiar de etapa.")
+    st.selectbox(
+        "📚 Etapas de la Misión 01",
+        options=ORDEN_ETAPAS,
+        format_func=lambda item: (
+            f"{ORDEN_ETAPAS.index(item) + 1}. {ETIQUETAS_ETAPA[item]}"
+        ),
+        key=_clave_selector(equipo_id),
+        on_change=_al_cambiar_selector,
+        args=(equipo_id,),
     )
 
     # PREPARARSE es individual: el bloqueo de la Ficha grupal no impide

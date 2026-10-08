@@ -7,6 +7,7 @@ from config.cursos import CURSOS
 from config.horarios import ZONA_HORARIA
 from core.base_datos import obtener_conexion
 from core.evaluacion import revisar_mision
+from core.evaluacion_equipo import revisar_entrega_equipo, EvaluacionEquipoError
 
 
 # ==========================================================
@@ -224,7 +225,7 @@ def obtener_alumnos_curso(curso_id):
 
     return [dict(fila) for fila in resultados]
 
-def obtener_alumno_demo():
+def obtener_alumno_demo(alumno_id="CSC-DEMO-001"):
 
     conexion = obtener_conexion()
 
@@ -241,16 +242,119 @@ def obtener_alumno_demo():
                     activo,
                     tipo_alumno
                 FROM alumnos
-                WHERE alumno_id = 'CSC-DEMO-001'
+                WHERE alumno_id = :alumno_id
                   AND tipo_alumno = 'DEMO'
                   AND activo = TRUE
-            """)
+            """),
+            {"alumno_id": alumno_id},
         ).mappings().first()
 
     if resultado is None:
         return None
 
     return dict(resultado)
+
+def obtener_entregas_equipo_pendientes(curso_id):
+    """Consulta de solo lectura: una ficha formal por equipo pendiente."""
+    conexion = obtener_conexion()
+    with conexion.session as sesion:
+        filas = sesion.execute(
+            text("""
+                SELECT p.equipo_id, p.curso, p.mision_id, p.estado,
+                       p.ultima_version_entregada, p.fecha_envio,
+                       e.numero_equipo, e.nombre_equipo, e.nombre_empresa,
+                       f.ficha_equipo_id, f.contenido, f.descripcion_cambios,
+                       f.actor_alumno_id, f.fecha_envio AS fecha_ficha
+                FROM progreso_equipo_misiones AS p
+                JOIN equipos AS e ON e.equipo_id = p.equipo_id
+                JOIN fichas_equipo_mision AS f
+                  ON f.equipo_id = p.equipo_id
+                 AND f.mision_id = p.mision_id
+                 AND f.version_entrega = p.ultima_version_entregada
+                WHERE p.curso = :curso
+                  AND p.estado = 'PENDIENTE_REVISION'
+                  AND e.activo = TRUE
+                ORDER BY p.fecha_envio, e.numero_equipo
+            """),
+            {"curso": curso_id},
+        ).mappings().all()
+    return [dict(fila) for fila in filas]
+
+
+def mostrar_revision_equipos():
+    """Interfaz docente para revisar fichas de equipo, sin SQL de escritura propio."""
+    st.subheader("👨‍🏫 Revisión de entregas por equipo")
+    st.caption(
+        "Las entregas son versiones inmutables. La devolución queda "
+        "asociada a la ficha enviada y no altera su contenido."
+    )
+    curso_id = st.selectbox(
+        "Curso para revisar",
+        options=list(CURSOS.keys()),
+        format_func=lambda curso: CURSOS[curso]["nombre"],
+        key="revision_equipo_curso",
+    )
+    try:
+        pendientes = obtener_entregas_equipo_pendientes(curso_id)
+    except Exception:
+        st.error("No fue posible consultar las entregas de equipos.")
+        return
+    if not pendientes:
+        st.info("No hay fichas de equipos pendientes de revisión en este curso.")
+        return
+    st.metric("Entregas pendientes", len(pendientes))
+    for entrega in pendientes:
+        equipo_id = entrega["equipo_id"]
+        mision_id = entrega["mision_id"]
+        version = entrega["ultima_version_entregada"]
+        titulo = (
+            f"Equipo #{entrega['numero_equipo']} · "
+            f"{entrega['nombre_equipo']} · {mision_id} · V{version}"
+        )
+        with st.expander(titulo):
+            st.write(f"**Equipo:** {equipo_id}")
+            st.write(f"**Empresa:** {entrega['nombre_empresa'] or '—'}")
+            st.write(f"**Entrega:** {hora_local(entrega['fecha_ficha'])}")
+            st.write(f"**Presentada por:** {entrega['actor_alumno_id']}")
+            if entrega["descripcion_cambios"]:
+                st.write("**Cambios informados:**", entrega["descripcion_cambios"])
+            st.markdown("#### Ficha entregada (solo lectura)")
+            st.json(entrega["contenido"])
+            with st.form(key=f"revisar_equipo_{equipo_id}_{mision_id}_{version}"):
+                devolucion = st.text_area(
+                    "Devolución docente",
+                    placeholder="Indicá qué se logró y qué debe mejorar el equipo...",
+                    key=f"devolucion_equipo_{equipo_id}_{mision_id}_{version}",
+                )
+                col_ajustes, col_aprobar = st.columns(2)
+                ajustes = col_ajustes.form_submit_button(
+                    "🟡 Requiere ajustes", use_container_width=True
+                )
+                aprobar = col_aprobar.form_submit_button(
+                    "🟢 Aprobar", use_container_width=True
+                )
+                if ajustes or aprobar:
+                    if not devolucion.strip():
+                        st.error("Escribí una devolución antes de revisar.")
+                    else:
+                        decision = "REQUIERE_AJUSTES" if ajustes else "APROBADA"
+                        try:
+                            revisar_entrega_equipo(
+                                equipo_id=equipo_id,
+                                mision_id=mision_id,
+                                decision=decision,
+                                devolucion=devolucion,
+                            )
+                        except (EvaluacionEquipoError, ValueError) as error:
+                            st.error(str(error))
+                        except Exception:
+                            st.error("No se pudo registrar la revisión. Verificá el estado en Supabase.")
+                        else:
+                            st.session_state["mensaje_revision_equipo"] = (
+                                f"Revisión registrada: {equipo_id} · {decision}."
+                            )
+                            st.rerun()
+
 
 def mostrar_dashboard_docente():
     # ==========================================================
@@ -269,6 +373,7 @@ def mostrar_dashboard_docente():
             "📊 Seguimiento",
             "👁️ Vista como alumno",
             "🧪 Laboratorio DEMO",
+            "👨‍🏫 Revisión de equipos",
     ],
     horizontal=True,
     key="herramienta_docente",
@@ -282,6 +387,13 @@ def mostrar_dashboard_docente():
 
     if modo == "🧪 Laboratorio DEMO":
         mostrar_laboratorio_demo()
+        return
+
+    if modo == "👨‍🏫 Revisión de equipos":
+        mensaje = st.session_state.pop("mensaje_revision_equipo", None)
+        if mensaje:
+            st.success(mensaje)
+        mostrar_revision_equipos()
         return
 
     # ==========================================================
@@ -689,12 +801,29 @@ def mostrar_laboratorio_demo():
         "exclusivamente al alumno DEMO."
     )
 
-    alumno = obtener_alumno_demo()
+    laboratorios = {
+        "3.º año · M01 ENCONTRAR": "CSC-DEMO-001",
+        "5.º año · M01 DESCUBRIR": "CSC-DEMO-5A-001",
+    }
+
+    laboratorio = st.selectbox(
+        "Elegí el laboratorio de pruebas",
+        options=list(laboratorios),
+        key="laboratorio_demo_curso",
+    )
+    alumno_id = laboratorios[laboratorio]
+    alumno = obtener_alumno_demo(alumno_id)
 
     if alumno is None:
         st.error(
-            "No se encontró CSC-DEMO-001 en PostgreSQL."
+            f"No se encontró {alumno_id} activo y de tipo DEMO "
+            "en PostgreSQL."
         )
+        return
+
+    curso_esperado = "3A" if alumno_id == "CSC-DEMO-001" else "5A"
+    if alumno["curso"] != curso_esperado:
+        st.error("El curso del alumno DEMO no coincide con el laboratorio.")
         return
 
     st.success(
